@@ -5,8 +5,6 @@ metadata:
   namespace: todo-app
   labels:
     app: todo-app
-  annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"todo-app:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"todo-db-nextjs\")].image"}]'
 spec:
   replicas: 1
   selector:
@@ -21,7 +19,7 @@ spec:
     spec:
       containers:
       - name: todo-db-nextjs
-        image: todo-app:latest
+        image: quay.io/rpailer/todo-db:latest
         ports:
         - containerPort: 3000
           name: todo
