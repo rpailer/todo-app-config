@@ -1,0 +1,98 @@
+apiVersion: v1
+data:
+  CLOUDANT_DB_NAME: todo-db
+  CLOUDANT_URL: https://36368344-a692-4d01-bdb2-2e6d0f5f1d42-bluemix.cloudantnosqldb.appdomain.cloud
+  SERVER_URL: http://127.0.0.1:3000
+kind: ConfigMap
+metadata:
+  name: todo-app-config
+  namespace: rpailer-dev
+---
+apiVersion: v1
+data:
+  apikey: czUtamtOYWxEeFBCSnNhcmMtS0xieE5NOE93cHZNMHR4bEI0MXpVT2hyTHo=
+kind: Secret
+metadata:
+  name: todo-app-secret
+  namespace: rpailer-dev
+type: Opaque
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: todo-app-service
+  namespace: rpailer-dev
+spec:
+  ports:
+  - name: 8080-tcp
+    port: 8080
+    protocol: TCP
+    targetPort: 3000
+  selector:
+    app: todo-app
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"todo-app:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"todo-db-nextjs\")].image"}]'
+  labels:
+    app: todo-app
+  name: todo-app-deployment
+  namespace: rpailer-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: todo-app
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 100%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        alpha.image.policy.openshift.io/resolve-names: '*'
+      labels:
+        app: todo-app
+    spec:
+      containers:
+      - env:
+        - name: CLOUDANT_URL
+          valueFrom:
+            configMapKeyRef:
+              key: CLOUDANT_URL
+              name: todo-app-config
+        - name: CLOUDANT_DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              key: CLOUDANT_DB_NAME
+              name: todo-app-config
+        - name: CLOUDANT_APIKEY
+          valueFrom:
+            secretKeyRef:
+              key: apikey
+              name: todo-app-secret
+        image: todo-app:latest
+        name: todo-db-nextjs
+        ports:
+        - containerPort: 3000
+          name: todo
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: todo-app-route
+  namespace: rpailer-dev
+spec:
+  path: /
+  port:
+    targetPort: 8080-tcp
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: todo-app-service
